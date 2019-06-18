@@ -13,6 +13,8 @@ set :local_assets_dir, 'public' unless fetch(:local_assets_dir)
 set :skip_data_sync_confirm, ENV['SKIP_DATA_SYNC_CONFIRM'].to_s.casecmp('true').zero?
 set :disallow_pushing, false unless fetch(:disallow_pushing)
 set :compressor, :gzip unless fetch(:compressor)
+set :db_tools_db_role, :db unless fetch(:db_tools_db_role)
+set :db_tools_app_role, :app unless fetch(:db_tools_db_role)
 
 namespace :capistrano_db_tasks do
   task :check_can_push do
@@ -24,7 +26,7 @@ namespace :db do
   namespace :remote do
     desc 'Synchronize your remote database using local database data'
     task :sync => 'capistrano_db_tasks:check_can_push' do
-      on roles(:db) do
+      on roles(fetch(:db_tools_db_role)) do
         if fetch(:skip_data_sync_confirm) || Util.prompt('Are you sure you want to REPLACE THE REMOTE DATABASE with local database')
           Database.local_to_remote(self)
         end
@@ -35,7 +37,7 @@ namespace :db do
   namespace :local do
     desc 'Synchronize your local database using remote database data'
     task :sync do
-      on roles(:db) do
+      on roles(fetch(:db_tools_db_role)) do
         puts "Local database: #{Database::Local.new(self).database}"
         if fetch(:skip_data_sync_confirm) || Util.prompt('Are you sure you want to erase your local database with server database')
           Database.remote_to_local(self)
@@ -55,7 +57,7 @@ namespace :assets do
   namespace :remote do
     desc 'Synchronize your remote assets using local assets'
     task :sync => 'capistrano_db_tasks:check_can_push' do
-      on roles(:app) do
+      on roles(fetch(:db_tools_app_role)) do
         puts "Assets directories: #{fetch(:assets_dir)}"
         if fetch(:skip_data_sync_confirm) || Util.prompt("Are you sure you want to erase your server assets with local assets")
           Asset.local_to_remote(self)
@@ -67,7 +69,7 @@ namespace :assets do
   namespace :local do
     desc 'Synchronize your local assets using remote assets'
     task :sync do
-      on roles(:app) do
+      on roles(fetch(:db_tools_app_role)) do
         puts "Assets directories: #{fetch(:local_assets_dir)}"
         if fetch(:skip_data_sync_confirm) || Util.prompt("Are you sure you want to erase your local assets with server assets")
           Asset.remote_to_local(self)
@@ -88,11 +90,11 @@ namespace :app do
     desc 'Synchronize your remote assets AND database using local assets and database'
     task :sync => 'capistrano_db_tasks:check_can_push' do
       if fetch(:skip_data_sync_confirm) || Util.prompt("Are you sure you want to REPLACE THE REMOTE DATABASE AND your remote assets with local database and assets(#{fetch(:assets_dir)})")
-        on roles(:db) do
+        on roles(fetch(:db_tools_db_role)) do
           Database.local_to_remote(self)
         end
 
-        on roles(:app) do
+        on roles(fetch(:db_tools_app_role)) do
           Asset.local_to_remote(self)
         end
       end
@@ -105,11 +107,11 @@ namespace :app do
       puts "Local database     : #{Database::Local.new(self).database}"
       puts "Assets directories : #{fetch(:local_assets_dir)}"
       if fetch(:skip_data_sync_confirm) || Util.prompt("Are you sure you want to erase your local database AND your local assets with server database and assets(#{fetch(:assets_dir)})")
-        on roles(:db) do
+        on roles(fetch(:db_tools_db_role)) do
           Database.remote_to_local(self)
         end
 
-        on roles(:app) do
+        on roles(fetch(:db_tools_app_role)) do
           Asset.remote_to_local(self)
         end
       end

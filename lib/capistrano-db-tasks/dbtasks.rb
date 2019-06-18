@@ -15,6 +15,7 @@ set :disallow_pushing, false unless fetch(:disallow_pushing)
 set :compressor, :gzip unless fetch(:compressor)
 set :db_tools_db_role, :db unless fetch(:db_tools_db_role)
 set :db_tools_app_role, :app unless fetch(:db_tools_db_role)
+set :local_download_dir, 'db' unless fetch(:local_download_dir)
 
 namespace :capistrano_db_tasks do
   task :check_can_push do

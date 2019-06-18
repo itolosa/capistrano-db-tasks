@@ -141,8 +141,6 @@ module Database
       @cap.execute("cd #{@cap.current_path} && rm #{unzip_file}") if cleanup
     end
 
-    private
-
     def db_dump_file_path
       "#{db_dump_dir}/#{output_file}"
     end
@@ -195,14 +193,6 @@ module Database
       @cap.upload! db_local_file_path, db_dump_file_path
     end
 
-    private
-
-    def execute(cmd)
-      result = system cmd
-      @cap.error "Failed to execute the local command: #{cmd}" unless result
-      result
-    end
-
     def db_dump_file_path
       "#{db_dump_dir}/#{output_file}"
     end
@@ -217,6 +207,14 @@ module Database
 
     def db_local_dir
       @cap.fetch(:db_local_dir)
+    end
+
+    private
+
+    def execute(cmd)
+      result = system cmd
+      @cap.error "Failed to execute the local command: #{cmd}" unless result
+      result
     end
   end
 

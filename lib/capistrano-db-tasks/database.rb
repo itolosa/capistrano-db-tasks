@@ -121,8 +121,8 @@ module Database
       self
     end
 
-    def download(local_file = "#{output_file}")
-      @cap.download! db_dump_file_path, File.join(@cap.fetch(:local_download_dir), local_file)
+    def download(local_file = "#{db_local_file_path}")
+      @cap.download! db_dump_file_path, local_file
     end
 
     def clean_dump_if_needed
@@ -149,6 +149,14 @@ module Database
 
     def db_dump_dir
       @cap.fetch(:db_dump_dir) || "#{@cap.current_path}/db"
+    end
+
+    def db_local_file_path
+      "#{db_local_dir}/#{output_file}"
+    end
+
+    def db_local_dir
+      @cap.fetch(:db_local_dir)
     end
   end
 
@@ -179,13 +187,12 @@ module Database
     end
 
     def dump
-      execute "#{dump_cmd} | #{compressor.compress('-', output_file)}"
+      execute "#{dump_cmd} | #{compressor.compress('-', db_local_file_path)}"
       self
     end
 
     def upload
-      remote_file = "#{@cap.current_path}/#{output_file}"
-      @cap.upload! output_file, remote_file
+      @cap.upload! db_local_file_path, db_dump_file_path
     end
 
     private
@@ -194,6 +201,22 @@ module Database
       result = system cmd
       @cap.error "Failed to execute the local command: #{cmd}" unless result
       result
+    end
+
+    def db_dump_file_path
+      "#{db_dump_dir}/#{output_file}"
+    end
+
+    def db_dump_dir
+      @cap.fetch(:db_dump_dir) || "#{@cap.current_path}/db"
+    end
+
+    def db_local_file_path
+      "#{db_local_dir}/#{output_file}"
+    end
+
+    def db_local_dir
+      @cap.fetch(:db_local_dir)
     end
   end
 
@@ -213,7 +236,7 @@ module Database
       ensure
         remote_db.clean_dump_if_needed
       end
-      local_db.load(remote_db.output_file, instance.fetch(:db_local_clean))
+      local_db.load(remote_db.db_local_file_path, instance.fetch(:db_local_clean))
     end
 
     def local_to_remote(instance)
@@ -223,8 +246,8 @@ module Database
       check(local_db, remote_db)
 
       local_db.dump.upload
-      remote_db.load(local_db.output_file, instance.fetch(:db_local_clean))
-      File.unlink(local_db.output_file) if instance.fetch(:db_local_clean)
+      remote_db.load(local_db.db_local_file_path, instance.fetch(:db_local_clean))
+      File.unlink(local_db.db_local_file_path) if instance.fetch(:db_local_clean)
     end
   end
 end

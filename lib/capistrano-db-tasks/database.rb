@@ -247,5 +247,13 @@ module Database
       remote_db.load(local_db.db_local_file_path, instance.fetch(:db_local_clean))
       File.unlink(local_db.db_local_file_path) if instance.fetch(:db_local_clean)
     end
+
+    def local_to_local(instance, dump_file)
+      local_db = Database::Local.new(instance)
+
+      check(local_db)
+
+      local_db.load(dump_file, instance.fetch(:db_local_clean))
+    end
   end
 end

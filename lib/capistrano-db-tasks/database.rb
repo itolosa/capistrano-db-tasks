@@ -219,8 +219,20 @@ module Database
   end
 
   class << self
-    def check(local_db, remote_db)
-      raise 'Only mysql or postgresql on remote and local server is supported' unless (local_db.mysql? && remote_db.mysql?) || (local_db.postgresql? && remote_db.postgresql?)
+    def check(local_db, remote_db = nil)
+      return if mysql_db_valid?(local_db, remote_db)
+      return if postgresql_db_valid?(local_db, remote_db)
+
+      raise 'Only mysql or postgresql on remote and local server is supported'
+    end
+
+    def mysql_db_valid?(local_db, remote_db)
+      local_db.mysql? && (remote_db.nil? || remote_db && remote_db.mysql?)
+    end
+
+    def postgresql_db_valid?(local_db, remote_db)
+      local_db.postgresql? &&
+        (remote_db.nil? || (remote_db && remote_db.postgresql?))
     end
 
     def remote_to_local(instance)

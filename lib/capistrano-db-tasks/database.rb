@@ -73,12 +73,12 @@ module Database
     def import_cmd(file, is_dump = nil)
       if mysql?
         "mysql #{credentials} -D #{database} < #{file}"
-      elsif postgresql? and !is_dump
+      elsif postgresql? and is_dump.nil?
         terminate_connection_sql = "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '#{database}' AND pid <> pg_backend_pid();"
         "#{pgpass} psql -c \"#{terminate_connection_sql};\" #{credentials} #{database}; #{pgpass} dropdb #{credentials} #{database}; #{pgpass} createdb #{credentials} #{database}; #{pgpass} psql #{credentials} -d #{database} < #{file}"
-      elsif postgresql? and is_dump
+      elsif postgresql? and !is_dump.nil?
         terminate_connection_sql = "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '#{database}' AND pid <> pg_backend_pid();"
-        "#{pgpass} psql -c \"#{terminate_connection_sql};\" #{credentials} #{database}; #{pgpass} dropdb #{credentials} #{database}; #{pgpass} createdb #{credentials} #{database}; #{pgpass} pg_restore #{credentials}  --clean --no-acl --no-owner -d #{database} #{file}"
+        "#{pgpass} psql -c \"#{terminate_connection_sql};\" #{credentials} #{database}; #{pgpass} dropdb #{credentials} #{database}; #{pgpass} createdb #{credentials} #{database}; #{pgpass} pg_restore #{credentials} --clean --no-acl --no-owner -d #{database} #{file}"
       end
     end
 
@@ -138,16 +138,10 @@ module Database
 
     # cleanup = true removes the mysqldump file after loading, false leaves it in db/
     def load(file, cleanup)
-      file_extension = File.extname(file)
-      if file_extension == ".dump"
-        @cap.execute "cd #{@cap.current_path} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file, is_dump = true)}"
-        @cap.execute("cd #{@cap.current_path}") if cleanup
-      else
-        unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
-        # @cap.run "cd #{@cap.current_path} && bunzip2 -f #{file} && RAILS_ENV=#{@cap.rails_env} bundle exec rake db:drop db:create && #{import_cmd(unzip_file)}"
-        @cap.execute "cd #{@cap.current_path} && #{compressor.decompress(file)} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file)}"
-        @cap.execute("cd #{@cap.current_path} && rm #{unzip_file}") if cleanup
-      end
+      unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
+      # @cap.run "cd #{@cap.current_path} && bunzip2 -f #{file} && RAILS_ENV=#{@cap.rails_env} bundle exec rake db:drop db:create && #{import_cmd(unzip_file)}"
+      @cap.execute "cd #{@cap.current_path} && #{compressor.decompress(file)} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file)}"
+      @cap.execute("cd #{@cap.current_path} && rm #{unzip_file}") if cleanup
     end
 
     def db_dump_file_path
@@ -181,14 +175,20 @@ module Database
 
     # cleanup = true removes the mysqldump file after loading, false leaves it in db/
     def load(file, cleanup)
-      unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
-      puts "executing local: #{compressor.decompress(file)} && #{import_cmd(unzip_file)}"
-      execute("#{compressor.decompress(file)} && #{import_cmd(unzip_file)}")
-      if cleanup
-        puts "removing #{unzip_file}"
-        File.unlink(unzip_file)
+      file_extension = File.extname(file)
+      if file_extension == ".dump"
+        puts "executing local: #{import_cmd(file)}"
+        execute("#{import_cmd(unzip_file)}")
       else
-        puts "leaving #{unzip_file} (specify :db_local_clean in deploy.rb to remove)"
+        unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
+        puts "executing local: #{compressor.decompress(file)} && #{import_cmd(unzip_file)}"
+        execute("#{compressor.decompress(file)} && #{import_cmd(unzip_file)}")
+        if cleanup
+          puts "removing #{unzip_file}"
+          File.unlink(unzip_file)
+        else
+          puts "leaving #{unzip_file} (specify :db_local_clean in deploy.rb to remove)"
+        end
       end
       puts "Completed database import"
     end
@@ -269,7 +269,7 @@ module Database
       File.unlink(local_db.db_local_file_path) if instance.fetch(:db_local_clean)
     end
 
-    def local_to_local(instance, dump_file)
+    def local_to_local(instance, dump_file,)
       local_db = Database::Local.new(instance)
 
       check(local_db)

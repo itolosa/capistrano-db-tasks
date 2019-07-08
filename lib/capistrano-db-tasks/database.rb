@@ -177,8 +177,8 @@ module Database
     def load(file, cleanup)
       file_extension = File.extname(file)
       if file_extension == ".dump"
-        puts "executing local: #{import_cmd(file)}"
-        execute("#{import_cmd(unzip_file)}")
+        puts "executing local: #{import_cmd(file, is_dump = true)}"
+        execute("#{import_cmd(file, is_dump = true)}")
       else
         unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
         puts "executing local: #{compressor.decompress(file)} && #{import_cmd(unzip_file)}"

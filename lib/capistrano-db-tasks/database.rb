@@ -70,12 +70,15 @@ module Database
       end
     end
 
-    def import_cmd(file)
+    def import_cmd(file, is_dump = nil)
       if mysql?
         "mysql #{credentials} -D #{database} < #{file}"
-      elsif postgresql?
+      elsif postgresql? and !is_dump
         terminate_connection_sql = "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '#{database}' AND pid <> pg_backend_pid();"
         "#{pgpass} psql -c \"#{terminate_connection_sql};\" #{credentials} #{database}; #{pgpass} dropdb #{credentials} #{database}; #{pgpass} createdb #{credentials} #{database}; #{pgpass} psql #{credentials} -d #{database} < #{file}"
+      elsif postgresql? and is_dump
+        terminate_connection_sql = "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '#{database}' AND pid <> pg_backend_pid();"
+        "#{pgpass} psql -c \"#{terminate_connection_sql};\" #{credentials} #{database}; #{pgpass} dropdb #{credentials} #{database}; #{pgpass} createdb #{credentials} #{database}; #{pgpass} pg_restore #{credentials}  --clean --no-acl --no-owner -d #{database} #{file}"
       end
     end
 
@@ -135,10 +138,16 @@ module Database
 
     # cleanup = true removes the mysqldump file after loading, false leaves it in db/
     def load(file, cleanup)
-      unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
-      # @cap.run "cd #{@cap.current_path} && bunzip2 -f #{file} && RAILS_ENV=#{@cap.rails_env} bundle exec rake db:drop db:create && #{import_cmd(unzip_file)}"
-      @cap.execute "cd #{@cap.current_path} && #{compressor.decompress(file)} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file)}"
-      @cap.execute("cd #{@cap.current_path} && rm #{unzip_file}") if cleanup
+      file_extension = File.extname(file)
+      if file_extension == ".dump"
+        @cap.execute "cd #{@cap.current_path} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file, is_dump = true)}"
+        @cap.execute("cd #{@cap.current_path}") if cleanup
+      else
+        unzip_file = File.join(File.dirname(file), File.basename(file, ".#{compressor.file_extension}"))
+        # @cap.run "cd #{@cap.current_path} && bunzip2 -f #{file} && RAILS_ENV=#{@cap.rails_env} bundle exec rake db:drop db:create && #{import_cmd(unzip_file)}"
+        @cap.execute "cd #{@cap.current_path} && #{compressor.decompress(file)} && RAILS_ENV=#{@cap.fetch(:rails_env)} && #{import_cmd(unzip_file)}"
+        @cap.execute("cd #{@cap.current_path} && rm #{unzip_file}") if cleanup
+      end
     end
 
     def db_dump_file_path
